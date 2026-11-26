@@ -1,79 +1,49 @@
 #!/usr/bin/env python3
-"""Duskline Absurd Clause — make.fun bounty u-donrulezz-the-absurd-clause-contest-035cc0f1.
+"""Duskline Absurd Clause — emits one absurd ToS clause as entry.txt.
 
-Writes one absurd terms-of-service clause (a single English sentence,
-no more than 200 characters) to $MAKEFUN_OUTPUT_DIR/entry.txt.
-Deterministic, Python 3.13 standard library only, no network, no randomness.
-
-Safety rules:
-- Never writes into the repository directory: if the resolved output
-  directory is the repo dir or inside it, refuse and exit 0.
-- If MAKEFUN_OUTPUT_DIR is unset or empty, fall back to a fresh
-  temporary directory outside the repo.
-- Never raises: any failure exits 0 without writing anything.
+The contest asks for a single absurd clause (1-200 UTF-8 characters,
+one line). This program writes exactly that clause to the directory
+named by the MAKEFUN_OUTPUT_DIR environment variable and nothing else.
+If the output directory cannot be written, it exits quietly with
+status 0 instead of crashing.
 """
 
 import os
 import sys
-import tempfile
 
-ENTRY = "Upon your death, your account passes to your next of kin or, failing that, to a raccoon selected by us in our sole discretion."
-# Joke idea: pure deadpan legal boilerplate — "upon your death", "passes
-# to", "failing that", "in our sole discretion" — until the heir turns
-# out to be a raccoon the company picked. One clean sentence, no setup,
-# no explaining its own joke; the absurdity is a single concrete image
-# (the raccoon) dropped into the driest possible register.
-#
-# Revision note: the first draft opened "In the event of your death, your
-# account shall pass to ..." (141 chars). "Upon your death" and "passes
-# to" say the same thing in fewer words and read more like real boilerplate,
-# so the clause is now 126 characters with the joke untouched.
+CLAUSE = (
+    "Upon your death, your account passes to your next of kin or, "
+    "failing that, to a raccoon selected by us in our sole discretion."
+)
 
-REPO_DIR = os.path.dirname(os.path.abspath(__file__))
+FALLBACK_DIR = "/tmp"
 
 
-def _is_in_repo(path):
-    """True if path resolves to the repo dir or anywhere inside it."""
+def _pick_output_dir():
+    """Return the harness output directory, or a fallback if unset."""
+    requested = os.environ.get("MAKEFUN_OUTPUT_DIR")
+    if requested:
+        return requested
+    return FALLBACK_DIR
+
+
+def _write_clause(directory):
+    """Write the clause as a single line; return True on success."""
+    target = os.path.join(directory, "entry.txt")
     try:
-        resolved = os.path.realpath(path)
-    except Exception:
-        return True
-    repo = os.path.realpath(REPO_DIR)
-    return resolved == repo or resolved.startswith(repo + os.sep)
+        os.makedirs(directory, exist_ok=True)
+    except OSError:
+        return False
+    try:
+        with open(target, "w", encoding="utf-8", newline="\n") as handle:
+            handle.write(CLAUSE + "\n")
+    except OSError:
+        return False
+    return True
 
 
 def main():
-    try:
-        if not 1 <= len(ENTRY) <= 200:
-            return 0
-        if not ENTRY.strip():
-            return 0
-        if "\n" in ENTRY or "\r" in ENTRY:
-            return 0
-        ENTRY.encode("utf-8")
-
-        out_dir = os.environ.get("MAKEFUN_OUTPUT_DIR") or ""
-        if not out_dir:
-            out_dir = tempfile.mkdtemp(prefix="duskline-absurd-clause-")
-        if _is_in_repo(out_dir):
-            return 0
-
-        os.makedirs(out_dir, exist_ok=True)
-        target = os.path.join(out_dir, "entry.txt")
-        if _is_in_repo(target):
-            return 0
-        with open(target, "w", encoding="utf-8", newline="") as handle:
-            handle.write(ENTRY)
-        with open(target, "r", encoding="utf-8") as handle:
-            back = handle.read()
-        if back != ENTRY:
-            try:
-                os.remove(target)
-            except Exception:
-                pass
-            return 0
-    except Exception:
-        return 0
+    _write_clause(_pick_output_dir())
     return 0
 
 
